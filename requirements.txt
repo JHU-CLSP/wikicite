@@ -1,0 +1,5 @@
+torch
+ujson
+numpy
+tqdm
+mwparserfromhell

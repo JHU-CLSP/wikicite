@@ -16,11 +16,6 @@ class Citation:
     long: str | None = None
     short: str | None = None
 
-    @property
-    def is_empty_citation(self):
-        # no short/long content
-        return self.short is None and self.long is None
-
     def to_dict(self):
         return {
             'ref_type': self.ref_type, 'title': self.title, 'long': self.long, 'short': self.short,
@@ -74,20 +69,3 @@ def process_one_citation(citation):
         # we found the citation. exit the loop
         return cite
 
-
-def process_citations(citations: List[dict]) -> List[Citation]:
-    # one citation could appear multiple times if it contains multiple urls
-    # therefore we group them, using the content as the key
-    groups = defaultdict(list)
-    for cite_dict in citations:
-        cite = process_one_citation(cite_dict)
-        if cite is None or cite.is_empty_citation:
-            continue
-        groups[cite.key].append(cite)
-
-    ret = []
-    for li in groups.values():
-        # in each group, keep the one with the longest long citation
-        li.sort(key=lambda c: len(str(c.long)))
-        ret.append(li[-1])
-    return ret

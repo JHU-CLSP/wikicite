@@ -30,9 +30,13 @@ class MegaWika2Processor:
     def valid_citation(self, cite: Citation) -> bool:
         if self.citation_keep_criterion == 'all':
             return True
-        cite_bits = (cite.long is not None) * 2 + (cite.short is not None) * 1
-        keep_bits = {'long': 2, 'short': 1, 'both': 3}[self.citation_keep_criterion]
-        return bool(keep_bits & cite_bits)
+        if self.citation_keep_criterion == 'long':
+            return cite.long is not None
+        elif self.citation_keep_criterion == 'short':
+            return cite.short is not None
+        elif self.citation_keep_criterion == 'both':
+            return cite.long is not None and cite.short is not None
+        raise NotImplementedError
 
     def process_article(self, article_idx: int):
         article = self.corpus[article_idx]

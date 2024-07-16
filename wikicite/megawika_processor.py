@@ -55,6 +55,8 @@ class MegaWika2Processor:
                     if valid_citations:
                         # if citations exist, an example will be generated
                         ret.append({
+                            'article_title': article['title'],
+                            'last_revision': article['last_revision'],
                             'previous_text': ' '.join(previous_texts),
                             'citations': [cite.to_dict() for cite in valid_citations],
                             'target_sentence': item['content'],

@@ -43,7 +43,7 @@ class Dumper:
             lines = []
             for k in sorted(list(dikt.keys())):
                 lines.extend(dikt[k])
-            with open(os.path.join(self.dump_path, f'{file_idx:04}.jsonl'), 'w') as fp:
+            with open(os.path.join(self.dump_path, f'{file_idx:05}.jsonl'), 'w') as fp:
                 fp.write('\n'.join(lines))
 
     def need_dump(self, file_idx: int) -> bool:

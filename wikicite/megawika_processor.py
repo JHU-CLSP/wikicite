@@ -62,11 +62,12 @@ class MegaWika2Processor:
                             'article_title': article['title'],
                             'last_revision': article['last_revision'],
                             'previous_text': ' '.join(previous_texts),
-                            'citations': [cite.to_dict() for cite in valid_citations],
+                            'citations': [cite.to_dict(self.citation_keep_criterion) for cite in valid_citations],
                             'target_sentence': item['content'],
                             'article_idx': article_idx,
                             'element_idx': element_idx,
                         })
+                        # TODO: Fix the bug that citations are "prepended" to the target sentence
                     previous_texts.append(item['content'])
                     citations = []
             previous_texts.append('\n')

@@ -16,11 +16,18 @@ class Citation:
     long: str | None = None
     short: str | None = None
 
-    def to_dict(self):
-        return {
-            'ref_type': self.ref_type, 'title': self.title, 'long': self.long, 'short': self.short,
+    def to_dict(self, to_keep: str) -> Dict[str, str | int]:
+        ret = {
+            'ref_type': self.ref_type, 'title': self.title,
             'article_idx': self.locator[0], 'element_idx': self.locator[1]
         }
+        if to_keep == 'short':
+            ret['content'] = self.short
+        elif to_keep == 'long':
+            ret['content'] = self.long
+        else:
+            ret['long'], ret['short'] = self.long, self.short
+        return ret
 
 
 def process_one_citation(citation):

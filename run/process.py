@@ -1,4 +1,5 @@
 from argparse import ArgumentParser
+import traceback
 
 from tqdm import trange
 
@@ -17,7 +18,14 @@ def main():
     dumper = Dumper(lines_per_file=1000, dump_path=args.output)
 
     for article_idx in trange(len(processor.corpus)):
-        dumper.put(items=list(processor.process_article(article_idx)))
+        try:
+            a_list = processor.process_article(article_idx)
+        except Exception as e:
+            print(traceback.format_exc())
+            print('Error:', e)
+            a_list = []
+        dumper.put(a_list)
+
     dumper.dump(True)
 
     print('All done.')

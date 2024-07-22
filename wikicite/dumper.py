@@ -17,8 +17,8 @@ class Dumper:
         self.cached.extend(items)
         self.dump(False)
 
-    def dump(self, last: bool):
-        while len(self.cached) >= (self.lines_per_file if not last else 1):
+    def dump(self, force: bool):
+        while len(self.cached) >= (self.lines_per_file if not force else 1):
             os.makedirs(self.dump_path, exist_ok=True)
             to_dump = list(map(json.dumps, self.cached[:self.lines_per_file]))
             self.cached = self.cached[self.lines_per_file:]

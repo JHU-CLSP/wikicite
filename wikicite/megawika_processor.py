@@ -1,15 +1,11 @@
-import traceback
 from typing import List, Any, Dict, Iterable, Tuple, Set
-from copy import deepcopy
 try:
     import usjon as json
 except ImportError:
     import json
 from collections import defaultdict
 
-from tqdm import tqdm
 from spacy.lang.en import English
-from spacy.tokens.span import Span
 
 from .data_reader.jsonl_reader import JsonlCorpus
 from .citation_utils import process_one_citation, Citation
@@ -138,16 +134,6 @@ class MegaWika2Processor:
                     ret.append(item)
                 prefix += paragraph_text+'\n'
         return ret
-
-    def iterate_over_articles(self):
-        # collect idx
-        todos = list(range(len(self.corpus)))
-        for article_idx in tqdm(todos, desc='Processing articles', leave=True):
-            try:
-                yield self.process_article(article_idx)
-            except Exception as e:
-                print(f'Error when processing corpus {article_idx}: {e}')
-                print(traceback.format_exc())
 
     def dedup_citations(self, citations: List[Citation]) -> List[Dict[str, str]]:
         # one citation could appear multiple times if it contains multiple urls

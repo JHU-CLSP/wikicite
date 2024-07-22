@@ -1,5 +1,6 @@
 import traceback
-from typing import List
+from typing import List, Any, Dict, Iterable, Tuple, Set
+from copy import deepcopy
 try:
     import usjon as json
 except ImportError:
@@ -7,6 +8,8 @@ except ImportError:
 from collections import defaultdict
 
 from tqdm import tqdm
+from spacy.lang.en import English
+from spacy.tokens.span import Span
 
 from .data_reader.jsonl_reader import JsonlCorpus
 from .citation_utils import process_one_citation, Citation
@@ -14,6 +17,7 @@ from .citation_utils import process_one_citation, Citation
 
 class MegaWika2Processor:
     corpus_path: str
+    sent_end_len: int = 7
 
     def __init__(self, corpus_path: str, citation_keep_criterion: str):
         """
@@ -27,7 +31,13 @@ class MegaWika2Processor:
         self.corpus_path, self.citation_keep_criterion = corpus_path, citation_keep_criterion
         self.corpus = JsonlCorpus(self.corpus_path)
 
-    def valid_citation(self, cite: Citation) -> bool:
+        self.nlp_pipeline = English()
+        config = {"punct_chars": None}
+        self.nlp_pipeline.add_pipe(factory_name="sentencizer", config=config)
+
+    def valid_citation(self, cite: Citation | None) -> bool:
+        if cite is None:
+            return False
         if self.citation_keep_criterion == 'all':
             return True
         if self.citation_keep_criterion == 'long':
@@ -38,39 +48,95 @@ class MegaWika2Processor:
             return cite.long is not None and cite.short is not None
         raise NotImplementedError
 
-    def process_article(self, article_idx: int):
-        article = self.corpus[article_idx]
-        ret, previous_texts = list(), list()
-        for element_idx, paragraph in enumerate(article['elements']):
-            if paragraph['type'] == 'heading':
-                previous_texts.append(paragraph['content'])
-                previous_texts.append('\n')
-                continue
-            if paragraph['type'] != 'paragraph':
-                continue
+    def preprocess_paragraph(self, elements) -> List[Dict[str, Any]]:
+        # filter unused citations
+        filtered = []
+        for ele in elements:
+            if ele['type'] == 'citation':
+                processed = process_one_citation(ele)
+                if self.valid_citation(processed):
+                    filtered.append({'type': 'citation', 'processed': processed})
+            elif ele['type'] == 'text':
+                filtered.append(ele)
 
-            citations = []
-            for item_idx, item in enumerate(paragraph['elements']):
-                if item['type'] == 'citation':
-                    item['article_idx'], item['element_idx'] = article_idx, element_idx
-                    citations.append(item)
-                elif item['type'] == 'text':
-                    valid_citations = self.process_citations(citations)
-                    if valid_citations:
-                        # if citations exist, an example will be generated
-                        ret.append({
-                            'article_title': article['title'],
-                            'last_revision': article['last_revision'],
-                            'previous_text': ' '.join(previous_texts),
-                            'citations': [cite.to_dict(self.citation_keep_criterion) for cite in valid_citations],
-                            'target_sentence': item['content'],
-                            'article_idx': article_idx,
-                            'element_idx': element_idx,
-                        })
-                        # TODO: Fix the bug that citations are "prepended" to the target sentence
-                    previous_texts.append(item['content'])
-                    citations = []
-            previous_texts.append('\n')
+        # group adjacent texts and citations
+        i = 0
+        grouped = []
+        while i < len(filtered):
+            j = i+1
+            typ = filtered[i]['type']
+            for k in range(i+1, len(filtered)):
+                if filtered[k]['type'] == typ:
+                    j = k+1
+                else:
+                    break
+
+            if typ == 'text':
+                content = ' '.join([ele['content'] for ele in filtered[i:j]])
+                while '  ' in content:
+                    content = content.replace('  ', ' ')
+                grouped.append({'type': 'text', 'content': content + ' '})
+            else:
+                grouped.append({
+                    'type': 'citation',
+                    'citations': self.dedup_citations([filtered[k]['processed'] for k in range(i, j)])
+                })
+            i = j
+
+        return grouped
+
+    def gen_examples_from_paragraph(self, paragraph: List) -> Iterable[Dict[str, Any]]:
+        text = ''.join([ele['content'] for ele in paragraph if ele['type'] == 'text'])
+        doc = list(self.nlp_pipeline(text).sents)
+        sent_ends = set()
+        for sent in doc:
+            sent_ends.add(sent.text.strip()[-self.sent_end_len:])
+        previous_text = ''
+        cached_citations = []
+        for ele in paragraph:
+            if ele['type'] == 'text':
+                previous_text += ele['content']
+            else:
+                assert ele['type'] == 'citation'
+                if not previous_text:
+                    cached_citations.extend(ele['citations'])
+                    continue
+                cur_end = previous_text.strip()[-self.sent_end_len:]
+                if cur_end not in sent_ends:
+                    # not the end of a sentence
+                    cached_citations.extend(ele['citations'])
+                    continue
+                citations = cached_citations + ele['citations']
+                cached_citations = []
+                # moving pointer left, until a sentence end is found
+                ptr = len(previous_text) - int(self.sent_end_len * 0.5)
+                while ptr >= 0 and previous_text[ptr-self.sent_end_len:ptr] not in sent_ends:
+                    ptr -= 1
+                sentence_start = ptr + 1 if ptr > 0 else 0
+                yield {
+                    'target_sentence': previous_text[sentence_start:].strip(),
+                    'previous_text': previous_text[:sentence_start].strip(),
+                    'citations': citations,
+                }
+
+    def process_article(self, article_idx: int):
+        dikt = self.corpus[article_idx]
+        prefix = ''
+        ret = []
+        for ele in dikt['elements']:
+            if ele['type'] == 'heading':
+                prefix += ele['content']+'\n'
+            elif ele['type'] == 'paragraph':
+                preprocessed_paragraph = self.preprocess_paragraph(ele['elements'])
+                paragraph_text = ''.join([ele['content'] for ele in preprocessed_paragraph if ele['type'] == 'text'])
+                if paragraph_text == '':
+                    continue
+                for item in self.gen_examples_from_paragraph(preprocessed_paragraph):
+                    item['previous_text'] = prefix + ' ' + item['previous_text']
+                    item['article_title'] = dikt['title']
+                    item['last_revision'] = dikt['last_revision']
+                    ret.append(item)
+                prefix += paragraph_text+'\n'
         return ret
 
     def iterate_over_articles(self):
@@ -83,19 +149,26 @@ class MegaWika2Processor:
                 print(f'Error when processing corpus {article_idx}: {e}')
                 print(traceback.format_exc())
 
-    def process_citations(self, citations: List[dict]) -> List[Citation]:
+    def dedup_citations(self, citations: List[Citation]) -> List[Dict[str, str]]:
         # one citation could appear multiple times if it contains multiple urls
         # therefore we group them, using the content as the key
         groups = defaultdict(list)
-        for cite_dict in citations:
-            cite = process_one_citation(cite_dict)
-            if cite is None or not self.valid_citation(cite):
-                continue
+        for cite in citations:
             groups[cite.key].append(cite)
 
-        ret = []
+        dedup = []
         for li in groups.values():
             # in each group, keep the one with the longest long citation
             li.sort(key=lambda c: len(str(c.long)))
-            ret.append(li[-1])
+            dedup.append(li[-1])
+
+        # convert it back to dict items
+        ret = []
+        for item in dedup:
+            if self.citation_keep_criterion == 'long':
+                ret.append({'type': 'long', 'content': item.long})
+            elif self.citation_keep_criterion == 'short':
+                ret.append({'type': 'short', 'content': item.short})
+            else:
+                ret.append({'type': 'citations', 'short': item.short, 'long': item.long})
         return ret

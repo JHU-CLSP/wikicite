@@ -42,7 +42,7 @@ def process_one_citation(citation):
     cite = Citation(
         hash(citation['content']),
         long=citation['source_text'],
-        locator=(citation['article_idx'], citation['element_idx'])
+        # locator=(citation['article_idx'], citation['element_idx'])
     )
     # one citation could contain more than one template; they might be mistakes.
     # this script iterates over these templates, and take the first template

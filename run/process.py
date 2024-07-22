@@ -17,7 +17,7 @@ def main():
     dumper = Dumper(lines_per_file=1000, dump_path=args.output)
 
     for article_idx in trange(len(processor.corpus)):
-        dumper.put(items=processor.process_article(article_idx))
+        dumper.put(items=list(processor.process_article(article_idx)))
     dumper.dump(True)
 
     print('All done.')

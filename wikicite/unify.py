@@ -1,10 +1,9 @@
-from typing import *
 from copy import deepcopy
 import os
 import random
 import secrets
 
-from tqdm import tqdm, trange
+from tqdm import trange
 import numpy as np
 from datetime import datetime
 try:
@@ -50,6 +49,6 @@ def unify_and_split(src: str, tgt: str):
             for i in trange(total, desc=f'writing {split}'):
                 item = deepcopy(data[split][i])
                 item['id'] = secrets.token_hex(16)
-                f.write(json.dumps(data[split][i]))
+                f.write(json.dumps(item))
                 if i != total - 1:
                     f.write('\n')

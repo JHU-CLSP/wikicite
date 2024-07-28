@@ -75,7 +75,7 @@ class MegaWika2Processor:
             else:
                 grouped.append({
                     'type': 'citation',
-                    'citations': self.dedup_citations([filtered[k]['processed'] for k in range(i, j)])
+                    'citations': [filtered[k]['processed'] for k in range(i, j)]
                 })
             i = j
 
@@ -112,11 +112,16 @@ class MegaWika2Processor:
                 yield {
                     'target_sentence': previous_text[sentence_start:].strip(),
                     'previous_text': previous_text[:sentence_start].strip(),
-                    'citations': citations,
+                    'citations': self.dedup_citations(citations),
                 }
 
     def process_article(self, article_idx: int):
         dikt = self.corpus[article_idx]
+        title = dikt['title']
+        for ignore_type in ['File', 'Template', "Wikipedia", 'Portal']:
+            # ignore some page types
+            if title.startswith(f'{ignore_type}:'):
+                return []
         prefix = ''
         ret = []
         for ele in dikt['elements']:
@@ -129,7 +134,8 @@ class MegaWika2Processor:
                     continue
                 for item in self.gen_examples_from_paragraph(preprocessed_paragraph):
                     item['previous_text'] = prefix + ' ' + item['previous_text']
-                    item['article_title'] = dikt['title']
+                    item['article_title'] = title
+                    item['article_index'] = article_idx
                     item['last_revision'] = dikt['last_revision']
                     ret.append(item)
                 prefix += paragraph_text+'\n'

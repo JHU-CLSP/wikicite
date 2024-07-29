@@ -163,9 +163,9 @@ class MegaWika2Processor:
         ret = []
         for item in dedup:
             if self.citation_keep_criterion == 'long':
-                ret.append({'type': 'long', 'content': item.long})
+                ret.append({'type': 'long', 'content': item.long, 'ref_type': item.ref_type})
             elif self.citation_keep_criterion == 'short':
-                ret.append({'type': 'short', 'content': item.short})
+                ret.append({'type': 'short', 'content': item.short, 'ref_type': item.ref_type})
             else:
-                ret.append({'type': 'citations', 'short': item.short, 'long': item.long})
+                ret.append({'type': 'citations', 'short': item.short, 'long': item.long, 'ref_type': item.ref_type})
         return ret

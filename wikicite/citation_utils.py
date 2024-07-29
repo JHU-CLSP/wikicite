@@ -70,7 +70,9 @@ def process_one_citation(citation):
         for line in template.params:
             line = line.strip()
             if line.startswith('quote='):
-                cite.short = line[len('quote='):].strip()
+                short = line[len('quote='):].strip()
+                if short != '':
+                    cite.short = short
             if line.startswith('title='):
                 cite.title = line[len('title='):].strip()
         # we found the citation. exit the loop

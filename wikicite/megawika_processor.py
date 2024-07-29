@@ -36,12 +36,17 @@ class MegaWika2Processor:
             return False
         if self.citation_keep_criterion == 'all':
             return True
+        long_valid = short_valid = False
+        if cite.long is not None and len(cite.long) > 100:
+            long_valid = True
+        if cite.short is not None and len(cite.short) > 10:
+            short_valid = True
         if self.citation_keep_criterion == 'long':
-            return cite.long is not None
+            return long_valid
         elif self.citation_keep_criterion == 'short':
-            return cite.short is not None
+            return short_valid
         elif self.citation_keep_criterion == 'both':
-            return cite.long is not None and cite.short is not None
+            return long_valid and short_valid
         raise NotImplementedError
 
     def preprocess_paragraph(self, elements) -> List[Dict[str, Any]]:
